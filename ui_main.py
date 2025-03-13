@@ -482,7 +482,7 @@ class HydroApp(QMainWindow):
             logo_path = os.path.join(sys._MEIPASS, 'images', 'CUWALID_Logo_LS_Full_Colour.png')
         else:
             # Running from source (development mode)
-            logo_path = 'CUWALID_Logo_LS_Full_Colour.png'
+            logo_path = 'images/CUWALID_Logo_LS_Full_Colour.png'
         
         try:
             # Load the logo image
