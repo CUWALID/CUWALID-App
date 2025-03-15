@@ -1,4 +1,7 @@
 APP_STYLESHEET = """
+            * {
+                color: white; /* Default text color for all widgets */
+            }
             QMainWindow {
                 background-color: #2d2d2d;
                 color: #ffffff;
@@ -37,6 +40,7 @@ APP_STYLESHEET = """
             QComboBox {
                 background-color: #3d3d3d;
                 color: white;
+                border: 1px solid #1a1a1a;
                 border-radius: 4px;
                 padding: 6px;
                 min-height: 30px;
@@ -51,5 +55,17 @@ APP_STYLESHEET = """
             QProgressBar::chunk {
                 background-color: #3c6e71;
                 width: 20px;
+            }
+            QListWidget {
+                background-color: #3d3d3d;
+                border: 1px solid #1a1a1a;
+                border-radius: 4px;
+            }
+            QFrame {
+                background-color: #3d3d3d;
+            }
+            QGroupBox {
+                border: 2px solid #2d2d2d;
+                padding: 10px;
             }
         """

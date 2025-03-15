@@ -6,7 +6,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('CUWALID_Logo_LS_Full_Colour.png', 'images')],
+    datas=[('images/CUWALID_Logo_LS_Full_Colour.png', 'images'), ('images/cuwalid_icon.ico', 'images')],
     hiddenimports = collect_submodules('rasterio') + collect_submodules('landlab'),
     hookspath=[],
     hooksconfig={},
@@ -36,5 +36,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['cuwalid_icon.ico'],
+    icon=['images/cuwalid_icon.ico'],
 )

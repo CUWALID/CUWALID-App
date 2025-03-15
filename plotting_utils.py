@@ -99,3 +99,43 @@ class Plotter:
         plt.tight_layout()
         plt.show()
         self.ui.status_bar.showMessage(f"Loaded and plotted data from: {file_path}")
+
+    def plot_csv_variable(self):
+        if self.ui.csv_dataframe is None:
+            return
+
+        df = self.ui.csv_dataframe
+        df['Date'] = pd.to_datetime(df['Date'])
+
+        # Get checked items instead of selected ones
+        selected_vars = []
+        for index in range(self.ui.csv_var_selector.count()):
+            item = self.ui.csv_var_selector.item(index)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_vars.append(item.text())
+
+        if not selected_vars:
+            self.ui.status_bar.showMessage("Please select at least one variable.")
+            return
+
+        plt.clf()
+        plt.close('all')
+        plt.figure(figsize=(10, 6))
+
+        for var in selected_vars:
+            if var in df.columns:
+                plt.plot(df['Date'], df[var], label=var)
+
+        plt.xlabel('Date')
+        plt.ylabel('Value')
+        plt.title("Time Series Plot")
+        plt.legend()
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
+        self.ui.status_bar.showMessage(f"Plotted CSV Variable(s): {', '.join(selected_vars)}")
+
+
+
+
