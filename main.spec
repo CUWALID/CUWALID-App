@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_submodules
 
 
 a = Analysis(
-    ['ui_main.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
     datas=[('CUWALID_Logo_LS_Full_Colour.png', 'images')],
