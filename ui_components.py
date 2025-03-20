@@ -3,7 +3,7 @@ import sys
 from PyQt6.QtWidgets import (QMainWindow, QListWidget, QFrame, QPushButton, QLabel, QVBoxLayout, QWidget, QGridLayout, QGroupBox, QStatusBar, QComboBox, QTabWidget, QStyle, QHBoxLayout, QSizePolicy, QProgressBar, QDialog)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QIcon
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QTextEdit
 from data_processing import DataProcessor
 from plotting_utils import Plotter
 from constants import APP_STYLESHEET
@@ -76,14 +76,15 @@ class CuwalidAPP(QMainWindow):
         
         self.netcdf_dataset = None
 
+
     def init_model_tab(self):
         layout = QVBoxLayout()
-        
+
         self.load_json_button = QPushButton("Load Model Input JSON")
         self.load_json_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.load_json_button.clicked.connect(self.data_processor.load_json)
         layout.addWidget(self.load_json_button)
-        
+
         self.run_model_button = QPushButton("Run Hydrological Model")
         pixmapi = getattr(QStyle.StandardPixmap, "SP_MediaPlay")
         icon = self.style().standardIcon(pixmapi)
@@ -91,7 +92,13 @@ class CuwalidAPP(QMainWindow):
         self.run_model_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.run_model_button.clicked.connect(self.data_processor.run_model)
         layout.addWidget(self.run_model_button)
-        
+
+        # Add QTextEdit for model output
+        self.model_output = QTextEdit()
+        self.model_output.setReadOnly(True)
+        self.model_output.setStyleSheet("background-color: black; color: lightgreen;")
+        layout.addWidget(self.model_output)
+
         layout.addStretch()
         self.model_tab.setLayout(layout)
 
