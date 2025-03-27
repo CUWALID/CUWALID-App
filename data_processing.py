@@ -211,22 +211,26 @@ class ModelRunnerThread(QThread):
         except Exception as e:
             error_message = f"Error running model: {e}\n{traceback.format_exc()}"
             self.error_signal.emit(error_message)  # Send error message to UI
-            sys.__stderr__.write(error_message)  # Print to terminal
+            #sys.__stderr__.write(error_message)  # Print to terminal
 
         finally:
-            # Restore original stdout/stderr after execution
-            sys.stdout = sys.__stdout__
-            sys.stderr = sys.__stderr__
+            if sys.__stdout__ is not None:
+                sys.stdout = sys.__stdout__
+            if sys.__stderr__ is not None:
+                sys.stderr = sys.__stderr__
+
 
     def write(self, message):
         """Emit output messages to the UI and print to terminal."""
         if message.strip():
             self.output_signal.emit(message)  # Emit message to UI
-            sys.__stdout__.write(message)  # Print to terminal
+            if sys.__stdout__ is not None:  # Prevent NoneType error
+                sys.__stdout__.write(message)
 
     def flush(self):
-        """Ensure flushing of stdout."""
-        sys.__stdout__.flush()
+        """Ensure flushing works properly."""
+        if sys.__stdout__ is not None:
+            sys.__stdout__.flush()
 
 
 class QTextEditLogger(QObject):
@@ -263,3 +267,4 @@ class QTextEditLogger(QObject):
         except Exception as e:
             # In case flushing fails, just handle the exception
             pass
+
