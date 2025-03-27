@@ -1,6 +1,6 @@
 import os
 import sys
-from PyQt6.QtWidgets import (QMainWindow, QListWidget, QFrame, QPushButton, QLabel, QVBoxLayout, QWidget, QGridLayout, QGroupBox, QStatusBar, QComboBox, QTabWidget, QStyle, QHBoxLayout, QSizePolicy, QProgressBar, QDialog)
+from PyQt6.QtWidgets import (QMainWindow, QListWidget, QCheckBox, QFrame, QPushButton, QLabel, QVBoxLayout, QWidget, QGridLayout, QGroupBox, QStatusBar, QComboBox, QTabWidget, QStyle, QHBoxLayout, QSizePolicy, QProgressBar, QDialog)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtWidgets import QApplication, QTextEdit
@@ -46,7 +46,7 @@ class CuwalidAPP(QMainWindow):
         self.model_tab = QWidget()
         self.visualization_tab = QWidget()
         self.tabs.addTab(self.visualization_tab, "Visualisation")
-        self.tabs.addTab(self.model_tab, "Model Execution")
+        self.tabs.addTab(self.model_tab, "Run DRYP")
         
         self.init_visualization_tab()
         self.init_model_tab()
@@ -80,12 +80,12 @@ class CuwalidAPP(QMainWindow):
     def init_model_tab(self):
         layout = QVBoxLayout()
 
-        self.load_json_button = QPushButton("Load Model Input JSON")
+        self.load_json_button = QPushButton("Load JSON Input")
         self.load_json_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.load_json_button.clicked.connect(self.data_processor.load_json)
         layout.addWidget(self.load_json_button)
 
-        self.run_model_button = QPushButton("Run Hydrological Model")
+        self.run_model_button = QPushButton("Run DRYP")
         pixmapi = getattr(QStyle.StandardPixmap, "SP_MediaPlay")
         icon = self.style().standardIcon(pixmapi)
         self.run_model_button.setIcon(icon)
@@ -104,78 +104,131 @@ class CuwalidAPP(QMainWindow):
 
     def init_visualization_tab(self):
         main_layout = QVBoxLayout()
-
         file_layout = QGridLayout()
 
-        # DEM & Shapefile Buttons
-        self.load_dem_button = QPushButton("Load DEM File (ASCII .asc)")
-        self.load_dem_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
-        self.load_dem_button.clicked.connect(self.data_processor.load_dem)
-        file_layout.addWidget(self.load_dem_button, 0, 0)
+        # --- Load Files Group (Raster, Shapefile, XY Data) ---
+        file_group = QGroupBox("Load Files and Plot")
+        file_group_layout = QGridLayout()
 
-        self.load_shapefile_button = QPushButton("Load Shapefile")
+        # Raster File
+        self.load_raster_button = QPushButton("Load Raster File (.asc or .tif)")
+        self.load_raster_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+        self.load_raster_button.clicked.connect(self.data_processor.load_raster)
+        self.raster_file_label = QLabel("No file loaded")  
+        self.raster_checkbox = QCheckBox("Plot Raster")
+        self.raster_checkbox.setEnabled(False)  # Initially disabled
+
+        file_group_layout.addWidget(self.load_raster_button, 0, 0)
+        file_group_layout.addWidget(self.raster_file_label, 1, 0)
+        file_group_layout.addWidget(self.raster_checkbox, 2, 0)
+
+        # Shapefile
+        self.load_shapefile_button = QPushButton("Load Shapefile (.shp)")
         self.load_shapefile_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         self.load_shapefile_button.clicked.connect(self.data_processor.load_shapefile)
-        file_layout.addWidget(self.load_shapefile_button, 0, 1)
+        self.shapefile_file_label = QLabel("No file loaded")  
+        self.shapefile_checkbox = QCheckBox("Plot Shapefile")
+        self.shapefile_checkbox.setEnabled(False)
 
-        # Separator Line
+        file_group_layout.addWidget(self.load_shapefile_button, 0, 1)
+        file_group_layout.addWidget(self.shapefile_file_label, 1, 1)
+        file_group_layout.addWidget(self.shapefile_checkbox, 2, 1)
+
+        # XY Data
+        self.load_xy_button = QPushButton("Load XY Data (.csv)")
+        self.load_xy_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+        self.load_xy_button.clicked.connect(self.data_processor.load_xy)
+        self.xy_file_label = QLabel("No file loaded")  
+        self.xy_checkbox = QCheckBox("Plot XY Data")
+        self.xy_checkbox.setEnabled(False)
+
+        file_group_layout.addWidget(self.load_xy_button, 0, 2)
+        file_group_layout.addWidget(self.xy_file_label, 1, 2)
+        file_group_layout.addWidget(self.xy_checkbox, 2, 2)
+
+        # Final Plot Button (inside the Load Files group)
+        self.final_plot_button = QPushButton("Plot Selected Files")
+        self.final_plot_button.setEnabled(False)
+        self.final_plot_button.clicked.connect(self.plotter.plot_selected_files)
+        file_group_layout.addWidget(self.final_plot_button, 3, 0, 1, 3)  # Span across all columns
+
+        file_group.setLayout(file_group_layout)
+        file_layout.addWidget(file_group, 0, 0, 1, 3)  # Span 3 columns
+
+        # --- Separator Line ---
         line1 = QFrame()
         line1.setFrameShape(QFrame.Shape.HLine)
         line1.setFrameShadow(QFrame.Shadow.Sunken)
-        file_layout.addWidget(line1, 1, 0, 1, 2)  # Span across both columns
+        file_layout.addWidget(line1, 1, 0, 1, 3)
 
-        # NetCDF Group
+        # --- NetCDF Group (without checkboxes) ---
         netcdf_group = QGroupBox("NetCDF Selection")
         netcdf_layout = QVBoxLayout()
+
         self.load_netcdf_button = QPushButton("Load NetCDF File")
         self.load_netcdf_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         self.load_netcdf_button.clicked.connect(self.data_processor.load_netcdf)
+        self.netcdf_file_label = QLabel("No file loaded")  
+
         self.netcdf_var_selector = QComboBox()
         self.netcdf_var_selector.currentIndexChanged.connect(self.plotter.plot_netcdf_variable)
         self.netcdf_var_selector.setEnabled(False)
-        
+
         netcdf_layout.addWidget(self.load_netcdf_button)
+        netcdf_layout.addWidget(self.netcdf_file_label)
         netcdf_layout.addWidget(QLabel("NetCDF Variable:"))
         netcdf_layout.addWidget(self.netcdf_var_selector)
         netcdf_group.setLayout(netcdf_layout)
-        file_layout.addWidget(netcdf_group, 2, 0, 1, 2)  # Span across both columns
 
-        # Separator Line
+        file_layout.addWidget(netcdf_group, 2, 0, 1, 3)
+
+        # --- Separator Line ---
         line2 = QFrame()
         line2.setFrameShape(QFrame.Shape.HLine)
         line2.setFrameShadow(QFrame.Shadow.Sunken)
-        file_layout.addWidget(line2, 3, 0, 1, 2)
+        file_layout.addWidget(line2, 3, 0, 1, 3)
 
-        # CSV Group
-        csv_group = QGroupBox("CSV Data Selection and Plotting")
+       # --- CSV Group (without checkboxes) ---
+        csv_group = QGroupBox("CSV Data Selection")
         csv_layout = QVBoxLayout()
-        
-        self.load_csv_button = QPushButton("Load CSV")
+
+        # Button to load CSV file
+        self.load_csv_button = QPushButton("Load CSV File (.csv)")
         self.load_csv_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         self.load_csv_button.clicked.connect(self.data_processor.load_csv)
-        
+
+        # Label for CSV file
+        self.csv_file_label = QLabel("No file loaded")  
+
+        # List of variables from CSV to select for plotting
         self.csv_var_selector = QListWidget()
         self.csv_var_selector.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
-        self.csv_var_selector.setEnabled(False)
+        self.csv_var_selector.setEnabled(False)  # Initially disabled
         self.csv_var_selector.setMaximumHeight(100)
 
-        self.plot_csv_button = QPushButton("Plot Selected Variables")
-        self.plot_csv_button.setEnabled(False)
+        # Plot button for CSV
+        self.plot_csv_button = QPushButton("Plot CSV Data")
+        self.plot_csv_button.setEnabled(False)  # Initially disabled
         self.plot_csv_button.clicked.connect(self.plotter.plot_csv_variable)
 
+        # Add all widgets to CSV layout
         csv_layout.addWidget(self.load_csv_button)
+        csv_layout.addWidget(self.csv_file_label)
         csv_layout.addWidget(QLabel("CSV Variables:"))
         csv_layout.addWidget(self.csv_var_selector)
         csv_layout.addWidget(self.plot_csv_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # Set the layout for the CSV group
         csv_group.setLayout(csv_layout)
-        file_layout.addWidget(csv_group, 4, 0, 1, 2)
 
-        # No outer file_group, just directly add the layout
+        # Add CSV group to the main layout (spanning 3 columns)
+        file_layout.addWidget(csv_group, 4, 0, 1, 3)
+
+
+        # --- Apply Layout ---
         main_layout.addLayout(file_layout)
         main_layout.addStretch()
         self.visualization_tab.setLayout(main_layout)
-
 
     def show_loading(self, message="Loading data..."):
         self.loading_label.setText(message)
@@ -190,7 +243,7 @@ class CuwalidAPP(QMainWindow):
         self.update_buttons_state(True)
 
     def update_buttons_state(self, enabled):
-        self.load_dem_button.setEnabled(enabled)
+        self.load_raster_button.setEnabled(enabled)
         self.load_shapefile_button.setEnabled(enabled)
         self.load_netcdf_button.setEnabled(enabled)
         self.load_csv_button.setEnabled(enabled)

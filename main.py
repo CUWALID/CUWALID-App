@@ -26,7 +26,6 @@ def log_error(error_message):
 def show_critical_error(message):
     """Show an error message box with a detailed error."""
     msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Critical)
     msg_box.setWindowTitle("Fatal Error")
     msg_box.setText("The application encountered a critical error.")
     msg_box.setDetailedText(message)

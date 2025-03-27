@@ -9,12 +9,10 @@ class Plotter:
     def __init__(self, ui):
         self.ui = ui
 
-    def plot_raster(self, data, extent):
+    def plot_raster(self):
         try:
-            plt.clf()
-            plt.close('all')
             fig, ax = plt.subplots()
-            cax = ax.imshow(data, cmap='terrain', extent=extent, origin="upper")
+            cax = ax.imshow(self.ui.raster_data[0], cmap='terrain', extent=self.ui.raster_data[1], origin="upper")
             plt.colorbar(cax)
             plt.show()
         except Exception as e:
@@ -23,12 +21,35 @@ class Plotter:
 
     def plot_shapefile(self, gdf):
         try:
-            plt.clf()
-            plt.close('all')
             gdf.plot()
             plt.show()
         except Exception as e:
             self.ui.status_bar.showMessage(f"Error plotting shapefile: {e}")
+
+    def plot_xy(self, df, label_column=None):
+        if df is None or df.empty:
+            self.ui.status_bar.showMessage("No XY data to plot.")
+            return
+        
+        try:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.scatter(df["East"], df["North"], color='red', marker='o', label="XY Data Points")
+
+            # If a third column exists, use it for labels
+            if label_column:
+                for i, row in df.iterrows():
+                    ax.text(row["East"], row["North"], str(row[label_column]), fontsize=9, ha='right', va='bottom')
+
+            ax.set_xlabel("East (m)")
+            ax.set_ylabel("North (m)")
+            ax.set_title("Scatter Plot of XY Data")
+            ax.legend()
+            ax.grid(True)
+
+            plt.show()
+            self.ui.status_bar.showMessage("XY data plotted successfully.")
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error plotting XY data: {e}")
 
     def plot_netcdf_variable(self):
         if self.ui.netcdf_dataset is not None:
@@ -135,6 +156,23 @@ class Plotter:
         plt.show()
 
         self.ui.status_bar.showMessage(f"Plotted CSV Variable(s): {', '.join(selected_vars)}")
+
+    def plot_selected_files(self):
+        plt.clf()
+        plt.close('all')
+        if self.ui.raster_checkbox.isChecked():
+            self.plot_raster(self.ui.raster_data)
+
+        if self.ui.shapefile_checkbox.isChecked():
+            self.plot_shapefile(self.ui.shapefile_data)
+
+        if self.ui.xy_checkbox.isChecked():
+            self.plot_xy(self.ui.xy_data, self.ui.xy_labels)
+
+
+        self.ui.status_bar.showMessage("Plotted selected files.")
+
+
 
 
 
