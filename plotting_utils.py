@@ -161,7 +161,7 @@ class Plotter:
         plt.clf()
         plt.close('all')
         if self.ui.raster_checkbox.isChecked():
-            self.plot_raster(self.ui.raster_data)
+            self.plot_raster()
 
         if self.ui.shapefile_checkbox.isChecked():
             self.plot_shapefile(self.ui.shapefile_data)
