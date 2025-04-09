@@ -102,7 +102,6 @@ class DataProcessor:
 
     def process_netcdf_with_loading(self, filename):
         try:
-            # Using with statement to ensure proper closing of the NetCDF file
             with xr.open_dataset(filename) as ds:
                 self.ui.netcdf_dataset = ds
                 numeric_vars = [var for var in ds.data_vars 
@@ -112,13 +111,19 @@ class DataProcessor:
                     self.ui.netcdf_var_selector.clear()
                     self.ui.netcdf_var_selector.addItems(numeric_vars)
                     self.ui.netcdf_var_selector.setEnabled(True)
+                    
+                    # Enable plot button
+                    self.ui.plot_netcdf_button.setEnabled(True)
+
                     self.ui.status_bar.showMessage(f"NetCDF loaded successfully: {filename}")
                 else:
                     self.ui.status_bar.showMessage("No plottable numeric data found in NetCDF file.")
+                    self.ui.plot_netcdf_button.setEnabled(False)  # Keep disabled if no valid data
         except Exception as e:
             self.ui.status_bar.showMessage(f"Error loading NetCDF file: {e}")
         finally:
             self.ui.hide_loading()
+
 
     def load_json(self):
         filename, _ = QFileDialog.getOpenFileName(self.ui, "Open Model Input JSON", "", "JSON Files (*.json)")
@@ -155,40 +160,206 @@ class DataProcessor:
         self.ui.status_bar.showMessage("Model simulation completed")
         self.ui.hide_loading()
 
-    def load_csv(self):
-        filename, _ = QFileDialog.getOpenFileName(self.ui, "Open CSV File", "", "CSV Files (*.csv)")
-        if filename:
-            self.ui.show_loading("Loading CSV file...")
-            self.ui.status_bar.showMessage(f"Loading CSV File: {filename}")
-            self.ui.csv_file_label.setText(f"Loaded: {filename.split('/')[-1]}")  # Update label
-            QTimer.singleShot(100, lambda: self.process_csv_with_loading(filename))
+    def load_csv(self, dataset_num):
+        file_path, _ = QFileDialog.getOpenFileName(self.ui, "Load CSV File", "", "CSV Files (*.csv)")
 
-    def process_csv_with_loading(self, filename):
+        if file_path:
+            data = pd.read_csv(file_path)
+            
+            # Remove 'Date' column if present
+            columns = [col for col in data.columns if col.lower() != "date"]
+            file_name = os.path.basename(file_path)
+            
+            if dataset_num == 1:
+                self.ui.csv_file_label_1.setText(file_name)  # Store file path
+                self.ui.csv_var_selector_1.clear()
+                
+                # Add items with checkboxes
+                for i, column in enumerate(columns):
+                    item = QListWidgetItem(column)
+                    if i > 3:
+                        item.setCheckState(Qt.CheckState.Unchecked)  # unchecked
+                    else:
+                        item.setCheckState(Qt.CheckState.Checked)  # checked
+                    self.ui.csv_var_selector_1.addItem(item)
+                
+                self.ui.csv_var_selector_1.setEnabled(True)
+                self.ui.y_axis_label_1.setEnabled(True)  # Enable Y-axis title input
+                
+                # Store the DataFrame in csv_dataframe_1
+                self.ui.csv_dataframe_1 = data
+            else:
+                self.ui.csv_file_label_2.setText(file_name)  # Store file path
+                self.ui.csv_var_selector_2.clear()
+                
+                # Add items with checkboxes
+                for i, column in enumerate(columns):
+                    item = QListWidgetItem(column)
+                    if i > 3:
+                        item.setCheckState(Qt.CheckState.Unchecked)  # unchecked
+                    else:
+                        item.setCheckState(Qt.CheckState.Checked)  # checked
+                    self.ui.csv_var_selector_2.addItem(item)
+                
+                self.ui.csv_var_selector_2.setEnabled(True)
+                self.ui.y_axis_label_2.setEnabled(True)  # Enable Y-axis title input
+                
+                # Store the DataFrame in csv_dataframe_2
+                self.ui.csv_dataframe_2 = data
+
+            # Enable plot button if at least one dataset is loaded
+            if self.ui.csv_file_label_1.text() != "No file loaded" or self.ui.csv_file_label_2.text() != "No file loaded":
+                self.ui.plot_csv_button.setEnabled(True)
+
+    def extract_point_data(self):
         try:
-            # Read CSV file into dataframe, no explicit file lock, but we will handle it properly
-            df = pd.read_csv(filename)
-            if 'Date' not in df.columns:
-                self.ui.status_bar.showMessage("Error: 'Date' column missing from the CSV file.")
+            self.ui.show_loading("Extracting point data from NetCDF...")
+
+            points_df = self.ui.points_csv_data
+            selected_indices = [
+                i for i in range(self.ui.point_selector_list.count())
+                if self.ui.point_selector_list.item(i).checkState() == Qt.CheckState.Checked
+            ]
+
+            if not selected_indices:
+                self.ui.status_bar.showMessage("No points selected.")
                 return
-            
-            self.ui.csv_dataframe = df  # Store the dataframe
-            self.ui.csv_var_selector.clear()
-            
-            numeric_cols = [col for col in df.columns if col != 'Date']
 
-            for col in numeric_cols:
-                item = QListWidgetItem(col)
-                item.setCheckState(Qt.CheckState.Checked)  # Set default to checked
-                self.ui.csv_var_selector.addItem(item)
+            selected_points = []
+            for idx in selected_indices:
+                row = points_df.iloc[idx]
+                x = row['East']
+                y = row['North']
+                label = row.get('Label', f"P{idx}")
+                selected_points.append((x, y, label))
 
-            self.ui.csv_var_selector.setEnabled(True)
-            self.ui.plot_csv_button.setEnabled(True)  # Enable the plot button
+            variable_name = self.ui.netcdf_var_selector.currentText()
+            self.extract_netcdf_points(variable_name, selected_points)
 
-            self.ui.status_bar.showMessage(f"CSV loaded successfully: {filename}")
         except Exception as e:
-            self.ui.status_bar.showMessage(f"Error loading CSV: {e}")
+            self.ui.status_bar.showMessage(f"Error extracting point data: {e}")
         finally:
             self.ui.hide_loading()
+
+
+
+    def extract_netcdf_points(self, variable_name, selected_points):
+        try:
+            self.ui.show_loading("Extracting point data from NetCDF...")
+            dataset = self.ui.netcdf_dataset  # Assumes it's already loaded
+            df = pd.DataFrame()
+            df['Date'] = dataset['time'].values
+
+            lon = dataset['lon'].values
+            lat = dataset['lat'].values
+            var = dataset[variable_name]
+
+            for i, (x, y, label) in enumerate(selected_points):  # (East, North, OptionalLabel)
+                ds_point = var.sel(lon=x, lat=y, method='nearest')
+                column_name = f"{variable_name}_{label or i}"
+                df[column_name] = ds_point.values
+
+            # Save or update UI
+            out_path, _ = QFileDialog.getSaveFileName(self.ui, "Save Extracted Data", "", "CSV Files (*.csv)")
+            if out_path:
+                df.to_csv(out_path, index=False)
+                self.ui.status_bar.showMessage(f"Point data saved to: {out_path}")
+            else:
+                self.ui.status_bar.showMessage("Point extraction canceled by user.")
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error extracting NetCDF point data: {e}")
+        finally:
+            self.ui.hide_loading()
+
+
+    def extract_netcdf_region(self, variable_name):
+        try:
+            self.ui.show_loading("Extracting region data from NetCDF...")
+            ds = self.ui.netcdf_dataset[variable_name]
+            gdf = self.ui.shapefile_data
+            gdf = gdf.to_crs("EPSG:4326")  # match NetCDF lat/lon if necessary
+
+            # Prepare xarray dataset for clipping
+            ds = self.ui.netcdf_dataset[variable_name]
+            ds.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
+            ds.rio.write_crs("EPSG:4326", inplace=True)
+
+            df = pd.DataFrame()
+            df["Date"] = ds['time'].values
+
+            for index, geom in enumerate(gdf.geometry):
+                clipped = ds.rio.clip([geom], gdf.crs, drop=True)
+                avg_ts = clipped.mean(dim=("lat", "lon"), skipna=True)
+                df[f"{variable_name}_region_{index}"] = avg_ts.values
+
+            # Save or update UI
+            out_path, _ = QFileDialog.getSaveFileName(self.ui, "Save Region-Averaged Data", "", "CSV Files (*.csv)")
+            if out_path:
+                df.to_csv(out_path, index=False)
+                self.ui.status_bar.showMessage(f"Region data saved to: {out_path}")
+            else:
+                self.ui.status_bar.showMessage("Region extraction canceled.")
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error extracting region data: {e}")
+        finally:
+            self.ui.hide_loading()
+
+    def extract_region_data(self):
+        try:
+            if self.ui.shapefile_data is None:
+                self.ui.status_bar.showMessage("No shapefile loaded.")
+                return
+
+            variable_name = self.ui.netcdf_var_selector.currentText()
+            self.extract_netcdf_region(variable_name)
+
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error extracting region data: {e}")
+
+
+    def upload_extract_points_csv(self):
+        file_path, _ = QFileDialog.getOpenFileName(self.ui, "Load Points CSV", "", "CSV Files (*.csv)")
+        if not file_path:
+            return
+
+        try:
+            points_df = pd.read_csv(file_path)
+
+            if 'East' not in points_df.columns or 'North' not in points_df.columns:
+                self.ui.status_bar.showMessage("CSV must contain 'East' and 'North' columns.")
+                return
+
+            # Store loaded CSV in UI
+            self.ui.points_csv_data = points_df
+
+            # Populate the list widget for point selection
+            self.ui.point_selector_list.clear()
+            for i, row in points_df.iterrows():
+                label = row.get('Label', f"Point {i}")
+                item = QListWidgetItem(label)
+                item.setCheckState(Qt.CheckState.Unchecked)
+                self.ui.point_selector_list.addItem(item)
+
+            self.ui.point_selector_list.setEnabled(True)
+            self.ui.status_bar.showMessage("Points CSV loaded. Select points to extract.")
+
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error loading points CSV: {e}")
+
+    def upload_extract_shapefile(self):
+        file_path, _ = QFileDialog.getOpenFileName(self.ui, "Load Shapefile", "", "Shapefiles (*.shp)")
+        if not file_path:
+            return
+
+        try:
+            gdf = gpd.read_file(file_path)
+            self.ui.shapefile_data = gdf
+            self.ui.status_bar.showMessage("Shapefile loaded. Ready to extract.")
+        except Exception as e:
+            self.ui.status_bar.showMessage(f"Error loading shapefile: {e}")
+
+
+
 
 
 class ModelRunnerThread(QThread):

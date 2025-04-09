@@ -37,6 +37,16 @@ APP_STYLESHEET = """
             QPushButton:pressed {
                 background-color: #2a5254;
             }
+            QPushButton.plot-button {
+                background-color: #9a6100;  /* Darker orange */
+                color: white;
+            }
+            QPushButton.plot-button:hover {
+                background-color: #b97200;
+            }
+            QPushButton.plot-button:pressed {
+                background-color: #7a4c00;
+            }
             QComboBox {
                 background-color: #3d3d3d;
                 color: white;
@@ -65,7 +75,49 @@ APP_STYLESHEET = """
                 background-color: #3d3d3d;
             }
             QGroupBox {
-                border: 2px solid #2d2d2d;
+                border: 2px solid #4d8f93;
+                border-radius: 5px;
                 padding: 10px;
+                background-color: #2b2b2b;
+                color: #cccccc;
+                font-weight: bold;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 5px;
+            }
+            QToolBox::tab {
+                background-color: #3d3d3d;
+                color: #cccccc;
+                border: 1px solid #888888; /* Added border with a neutral color */
+                border-radius: 4px;
+                margin-right: 2px;
+                min-height: 40px;         /* Ensure the tab is tall enough */
+            }
+
+            QToolBox::tab:selected {
+                background-color: #555555;
+                color: #ffffff;
+                border: 1px solid #888888;
+            }
+
+            QToolBox::tab:hover {
+                background-color: #4d8f93;
+                color: #ffffff;
+                border: 1px solid #888888;
+            }
+
+            QLineEdit {
+                background-color: #3d3d3d;
+            }
+
+            QGroupBox {
+                max-height: 1000px;
+            }
+
+            QVBoxLayout {
+                max-height: 1000px;
             }
         """

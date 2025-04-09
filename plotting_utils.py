@@ -3,7 +3,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from PyQt6.QtWidgets import QSlider, QVBoxLayout
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QDialog
+import matplotlib.patheffects as path_effects
 import pandas as pd
+import itertools
 
 class Plotter:
     def __init__(self, ui):
@@ -122,58 +124,126 @@ class Plotter:
         self.ui.status_bar.showMessage(f"Loaded and plotted data from: {file_path}")
 
     def plot_csv_variable(self):
-        if self.ui.csv_dataframe is None:
+        plt.clf()
+        plt.close('all')
+        if self.ui.csv_dataframe_1 is None:
             return
 
-        df = self.ui.csv_dataframe
-        df['Date'] = pd.to_datetime(df['Date'])
+        df1 = self.ui.csv_dataframe_1
+        df1['Date'] = pd.to_datetime(df1['Date'])
 
-        # Get checked items instead of selected ones
-        selected_vars = []
-        for index in range(self.ui.csv_var_selector.count()):
-            item = self.ui.csv_var_selector.item(index)
-            if item.checkState() == Qt.CheckState.Checked:
-                selected_vars.append(item.text())
+        left_colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:brown', 'tab:purple']
+        right_colors = ['tab:red', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
 
-        if not selected_vars:
+        left_color_cycle = itertools.cycle(left_colors)
+        right_color_cycle = itertools.cycle(right_colors)
+
+        selected_vars_1 = [
+            self.ui.csv_var_selector_1.item(i).text()
+            for i in range(self.ui.csv_var_selector_1.count())
+            if self.ui.csv_var_selector_1.item(i).checkState() == Qt.CheckState.Checked
+        ]
+
+        has_second_dataset = self.ui.csv_dataframe_2 is not None
+        if has_second_dataset:
+            df2 = self.ui.csv_dataframe_2
+            df2['Date'] = pd.to_datetime(df2['Date'])
+            
+            selected_vars_2 = [
+                self.ui.csv_var_selector_2.item(i).text()
+                for i in range(self.ui.csv_var_selector_2.count())
+                if self.ui.csv_var_selector_2.item(i).checkState() == Qt.CheckState.Checked
+            ]
+        else:
+            selected_vars_2 = []
+
+        if not selected_vars_1 and not selected_vars_2:
             self.ui.status_bar.showMessage("Please select at least one variable.")
             return
 
-        plt.clf()
-        plt.close('all')
-        plt.figure(figsize=(10, 6))
+        fig, ax1 = plt.subplots(figsize=(10, 6))
 
-        for var in selected_vars:
-            if var in df.columns:
-                plt.plot(df['Date'], df[var], label=var)
+        # Plot first dataset on left y-axis
+        for var in selected_vars_1:
+            if var in df1.columns:
+                color = next(left_color_cycle)
+                ax1.plot(df1['Date'], df1[var], label=f"1: {var}", linestyle='-', color=color)
 
-        plt.xlabel('Date')
-        plt.ylabel('Value')
-        plt.title("Time Series Plot")
-        plt.legend()
+        y_label_1 = self.ui.y_axis_label_1.text() or "Dataset 1"
+        ax1.set_ylabel(y_label_1)
+        ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+        ax2 = None  # Initialize ax2
+
+        # Plot second dataset on right y-axis
+        if has_second_dataset and selected_vars_2:
+            ax2 = ax1.twinx()
+            for var in selected_vars_2:
+                if var in df2.columns:
+                    color = next(right_color_cycle)
+                    ax2.plot(df2['Date'], df2[var], label=f"2: {var}", linestyle='--', color=color)
+
+            y_label_2 = self.ui.y_axis_label_2.text() or "Dataset 2"
+            ax2.set_ylabel(y_label_2)
+            ax2.tick_params(axis='y', labelcolor='tab:red')
+
+        ax1.set_xlabel("Date")
+        ax1.set_title("Timeseries Plot")
+
+        # **Ensure legends are shown**
+        ax1.legend(loc='upper left')  # Legend for left y-axis variables
+        if ax2:
+            ax2.legend(loc='upper right')  # Legend for right y-axis variables
+
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.show()
 
-        self.ui.status_bar.showMessage(f"Plotted CSV Variable(s): {', '.join(selected_vars)}")
+        # Status update
+        plotted_vars = ", ".join(selected_vars_1 + selected_vars_2)
+        self.ui.status_bar.showMessage(f"Plotted Variables: {plotted_vars}")
+
+
 
     def plot_selected_files(self):
         plt.clf()
         plt.close('all')
-        if self.ui.raster_checkbox.isChecked():
-            self.plot_raster()
+        
+        fig, ax = plt.subplots(figsize=(10, 8))  # Create a single figure and axis
 
-        if self.ui.shapefile_checkbox.isChecked():
-            self.plot_shapefile(self.ui.shapefile_data)
+        # Plot Raster if enabled
+        if self.ui.raster_checkbox.isChecked() and self.ui.raster_data:
+            raster_data, extent = self.ui.raster_data
+            cax = ax.imshow(raster_data, cmap='terrain', extent=extent, origin="upper")
+            plt.colorbar(cax, ax=ax, label="Elevation")  # Add a colorbar
 
-        if self.ui.xy_checkbox.isChecked():
-            self.plot_xy(self.ui.xy_data, self.ui.xy_labels)
+        # Plot Shapefile if enabled
+        if self.ui.shapefile_checkbox.isChecked() and self.ui.shapefile_data is not None:
+            self.ui.shapefile_data.plot(ax=ax, edgecolor="black", facecolor="none")  # Plot borders
 
+        # Plot XY Data if enabled
+        if self.ui.xy_checkbox.isChecked() and self.ui.xy_data is not None:
+            df = self.ui.xy_data
+            ax.scatter(df["East"], df["North"], color='red', marker='o', label="XY Data Points")
 
-        self.ui.status_bar.showMessage("Plotted selected files.")
+            # If labels exist, add them to the points
+            if self.ui.xy_labels:
+                for i, row in df.iterrows():
+                    txt = ax.text(row["East"], row["North"], str(row[self.ui.xy_labels]), 
+                        fontsize=10, ha='right', va='bottom', color='white')
 
+                    # Add a black outline around the text
+                    txt.set_path_effects([path_effects.Stroke(linewidth=2, foreground='black'), 
+                                        path_effects.Normal()])
 
+        # Set Labels and Title
+        ax.set_xlabel("East (m)")
+        ax.set_ylabel("North (m)")
+        ax.set_title("Combined Hydrological Data Visualization")
+        ax.legend()
+        ax.grid(True)
 
-
+        plt.show()
+        self.ui.status_bar.showMessage("Plotted selected files together.")
 
 
