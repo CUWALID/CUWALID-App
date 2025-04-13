@@ -6,7 +6,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('images/CUWALID_Logo_LS_Full_Colour.png', 'images'), ('images/cuwalid_icon.ico', 'images')],
+    datas=[('images/CUWALID_Logo_LS_Tag_dark.png', 'images'), ('images/cuwalid_icon.ico', 'images')],
     hiddenimports = collect_submodules('rasterio') + collect_submodules('landlab') + collect_submodules('gdal'),
     hookspath=[],
     hooksconfig={},

@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal, QThread
 from PyQt6.QtWidgets import QFileDialog, QListWidgetItem, QApplication
 from PyQt6.QtGui import QTextCursor
 from cuwalid.dryp.main_DRYP import run_DRYP
+from shapely.geometry import mapping
 
 class DataProcessor:
     def __init__(self, ui):
@@ -103,26 +104,33 @@ class DataProcessor:
     def process_netcdf_with_loading(self, filename):
         try:
             with xr.open_dataset(filename) as ds:
-                self.ui.netcdf_dataset = ds
-                numeric_vars = [var for var in ds.data_vars 
-                                if ds[var].ndim in [2, 3] 
-                                and np.issubdtype(ds[var].dtype, np.number)]
-                if numeric_vars:
-                    self.ui.netcdf_var_selector.clear()
-                    self.ui.netcdf_var_selector.addItems(numeric_vars)
-                    self.ui.netcdf_var_selector.setEnabled(True)
-                    
-                    # Enable plot button
-                    self.ui.plot_netcdf_button.setEnabled(True)
+                # Fully load into memory and detach from file
+                loaded_ds = ds.load()
 
-                    self.ui.status_bar.showMessage(f"NetCDF loaded successfully: {filename}")
-                else:
-                    self.ui.status_bar.showMessage("No plottable numeric data found in NetCDF file.")
-                    self.ui.plot_netcdf_button.setEnabled(False)  # Keep disabled if no valid data
+            self.ui.netcdf_dataset = loaded_ds  # Now it's memory-only, file can be closed
+            self.ui.netcdf_path = filename  
+            
+            numeric_vars = [
+                var for var in loaded_ds.data_vars 
+                if loaded_ds[var].ndim in [2, 3] 
+                and np.issubdtype(loaded_ds[var].dtype, np.number)
+            ]
+
+            if numeric_vars:
+                self.ui.netcdf_var_selector.clear()
+                self.ui.netcdf_var_selector.addItems(numeric_vars)
+                self.ui.netcdf_var_selector.setEnabled(True)
+                self.ui.plot_netcdf_button.setEnabled(True)
+                self.ui.status_bar.showMessage(f"NetCDF loaded successfully: {filename}")
+            else:
+                self.ui.status_bar.showMessage("No plottable numeric data found in NetCDF file.")
+                self.ui.plot_netcdf_button.setEnabled(False)
+
         except Exception as e:
             self.ui.status_bar.showMessage(f"Error loading NetCDF file: {e}")
         finally:
             self.ui.hide_loading()
+
 
 
     def load_json(self):
@@ -185,6 +193,7 @@ class DataProcessor:
                 
                 self.ui.csv_var_selector_1.setEnabled(True)
                 self.ui.y_axis_label_1.setEnabled(True)  # Enable Y-axis title input
+                self.ui.select_all_csv1_checkbox.setEnabled(True)
                 
                 # Store the DataFrame in csv_dataframe_1
                 self.ui.csv_dataframe_1 = data
@@ -203,6 +212,7 @@ class DataProcessor:
                 
                 self.ui.csv_var_selector_2.setEnabled(True)
                 self.ui.y_axis_label_2.setEnabled(True)  # Enable Y-axis title input
+                self.ui.select_all_csv2_checkbox.setEnabled(True)
                 
                 # Store the DataFrame in csv_dataframe_2
                 self.ui.csv_dataframe_2 = data
@@ -271,38 +281,84 @@ class DataProcessor:
         finally:
             self.ui.hide_loading()
 
-
     def extract_netcdf_region(self, variable_name):
+        # Define the custom projection (same as used in your working script)
+        custom_crs = "+proj=laea +lat_0=5 +lon_0=20 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+
         try:
             self.ui.show_loading("Extracting region data from NetCDF...")
-            ds = self.ui.netcdf_dataset[variable_name]
+
+            # Get the shapefile data from the UI. Force the CRS to be custom_crs without reprojecting.
             gdf = self.ui.shapefile_data
-            gdf = gdf.to_crs("EPSG:4326")  # match NetCDF lat/lon if necessary
+            if gdf is None or gdf.empty:
+                self.ui.status_bar.showMessage("No shapefile loaded or shapefile is empty.")
+                return
 
-            # Prepare xarray dataset for clipping
-            ds = self.ui.netcdf_dataset[variable_name]
-            ds.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
-            ds.rio.write_crs("EPSG:4326", inplace=True)
+            # FORCE the shapefile's CRS to your custom projection (just like your working script)
+            gdf = gdf.set_crs(custom_crs, allow_override=True)
 
+            # Define a helper to read the correct variable from NetCDF
+            def read_dataset(fname, var_name='tht'):
+                if var_name == 'fch':
+                    fname_rp = fname.split('.')[0] + "rp.nc"
+                    data = xr.open_dataset(fname_rp)[var_name]
+                elif var_name == 'dch':
+                    fname_rp = fname.split('.')[0] + "rp.nc"
+                    data = xr.open_dataset(fname)['rch'] - xr.open_dataset(fname_rp)['fch']
+                else:
+                    data = xr.open_dataset(fname)[var_name]
+                return data
+
+            # Define a helper to extract average time series over a polygon
+            def extract_TS_dataset(data, gdf_geom, crs):
+                # Set the spatial dimensions for rioxarray
+                data = data.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=False)
+                # Write the CRS (forcing it to use our custom projection)
+                data = data.rio.write_crs(crs, inplace=False)
+                
+                # --- Optional Debug Print ---
+                # print("Dataset bounds:", data.rio.bounds())
+                # print("Polygon bounds:", gdf_geom.bounds)
+                # -------------------------------
+
+                # Clip to the polygon
+                zone_data = data.rio.clip([mapping(gdf_geom)], crs=crs, drop=True)
+                # Return the average value over the clipped zone
+                return zone_data.mean(dim=("lat", "lon"), skipna=True).squeeze().values
+
+            # Get the NetCDF file path and the pre-loaded dataset
+            nc_path = self.ui.netcdf_path
+            base_ds = self.ui.netcdf_dataset 
             df = pd.DataFrame()
-            df["Date"] = ds['time'].values
+            df['Date'] = base_ds['time'].values
 
-            for index, geom in enumerate(gdf.geometry):
-                clipped = ds.rio.clip([geom], gdf.crs, drop=True)
-                avg_ts = clipped.mean(dim=("lat", "lon"), skipna=True)
-                df[f"{variable_name}_region_{index}"] = avg_ts.values
+            # Loop through each polygon in the shapefile
+            for idx, geom in enumerate(gdf.geometry):
+                print(f"Processing region {idx}...")
+                # Read the dataset for the variable of interest
+                data = read_dataset(nc_path, var_name=variable_name)
+                # Extract the time series using the polygon and custom CRS
+                ts = extract_TS_dataset(data, geom, custom_crs)
+                df[f"{variable_name}_region_{idx}"] = ts
 
-            # Save or update UI
-            out_path, _ = QFileDialog.getSaveFileName(self.ui, "Save Region-Averaged Data", "", "CSV Files (*.csv)")
+            # Save the results
+            out_path, _ = QFileDialog.getSaveFileName(
+                self.ui, "Save Region-Averaged Data", "", "CSV Files (*.csv)"
+            )
             if out_path:
                 df.to_csv(out_path, index=False)
                 self.ui.status_bar.showMessage(f"Region data saved to: {out_path}")
             else:
                 self.ui.status_bar.showMessage("Region extraction canceled.")
+
         except Exception as e:
+            tb = traceback.format_exc()
             self.ui.status_bar.showMessage(f"Error extracting region data: {e}")
+            print(tb)
         finally:
             self.ui.hide_loading()
+
+
 
     def extract_region_data(self):
         try:
@@ -336,11 +392,12 @@ class DataProcessor:
             self.ui.point_selector_list.clear()
             for i, row in points_df.iterrows():
                 label = row.get('Label', f"Point {i}")
-                item = QListWidgetItem(label)
+                item = QListWidgetItem(str(label))
                 item.setCheckState(Qt.CheckState.Unchecked)
                 self.ui.point_selector_list.addItem(item)
 
             self.ui.point_selector_list.setEnabled(True)
+            self.ui.select_all_points_checkbox.setEnabled(True)
             self.ui.status_bar.showMessage("Points CSV loaded. Select points to extract.")
 
         except Exception as e:

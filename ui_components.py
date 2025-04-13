@@ -238,7 +238,16 @@ class CuwalidAPP(QMainWindow):
         horizontal_row.addWidget(self.point_selector_list)
 
         # Add label above for clarity
-        point_layout.addWidget(QLabel("Upload and Select Points from CSV:"))
+        point_label_layout = QHBoxLayout()
+        point_label = QLabel("Upload and Select Points from CSV:")
+        self.select_all_points_checkbox = QCheckBox("Select All")
+        self.select_all_points_checkbox.setEnabled(False)
+        self.select_all_points_checkbox.stateChanged.connect(self.toggle_all_points)
+        point_label_layout.addWidget(point_label)
+        point_label_layout.addStretch()
+        point_label_layout.addWidget(self.select_all_points_checkbox)
+        point_layout.addLayout(point_label_layout)
+
         point_layout.addLayout(horizontal_row)
 
         self.extract_point_button = QPushButton("Extract Data")
@@ -281,7 +290,15 @@ class CuwalidAPP(QMainWindow):
         csv_layout.addWidget(QLabel("Dataset 1 (Left Y-axis)"), 0, 0, Qt.AlignmentFlag.AlignCenter)
         csv_layout.addWidget(self.load_csv_button_1, 1, 0)
         csv_layout.addWidget(self.csv_file_label_1, 2, 0)
-        csv_layout.addWidget(QLabel("Select CSV variables:"), 3, 0)
+        csv_label_1_layout = QHBoxLayout()
+        csv_label_1 = QLabel("Select CSV variables:")
+        self.select_all_csv1_checkbox = QCheckBox("Select All")
+        self.select_all_csv1_checkbox.setEnabled(False)
+        self.select_all_csv1_checkbox.stateChanged.connect(self.toggle_all_csv1)
+        csv_label_1_layout.addWidget(csv_label_1)
+        csv_label_1_layout.addStretch()
+        csv_label_1_layout.addWidget(self.select_all_csv1_checkbox)
+        csv_layout.addLayout(csv_label_1_layout, 3, 0)
         csv_layout.addWidget(self.csv_var_selector_1, 4, 0)
         csv_layout.addWidget(self.y_axis_label_1, 6, 0)
 
@@ -303,7 +320,15 @@ class CuwalidAPP(QMainWindow):
         csv_layout.addWidget(QLabel("Dataset 2 (Right Y-axis)"), 0, 1, Qt.AlignmentFlag.AlignCenter)
         csv_layout.addWidget(self.load_csv_button_2, 1, 1)
         csv_layout.addWidget(self.csv_file_label_2, 2, 1)
-        csv_layout.addWidget(QLabel("Select CSV variables:"), 3, 1)
+        csv_label_2_layout = QHBoxLayout()
+        csv_label_2 = QLabel("Select CSV variables:")
+        self.select_all_csv2_checkbox = QCheckBox("Select All")
+        self.select_all_csv2_checkbox.setEnabled(False)
+        self.select_all_csv2_checkbox.stateChanged.connect(self.toggle_all_csv2)
+        csv_label_2_layout.addWidget(csv_label_2)
+        csv_label_2_layout.addStretch()
+        csv_label_2_layout.addWidget(self.select_all_csv2_checkbox)
+        csv_layout.addLayout(csv_label_2_layout, 3, 1)
         csv_layout.addWidget(self.csv_var_selector_2, 4, 1)
         csv_layout.addWidget(self.y_axis_label_2, 6, 1)
 
@@ -355,9 +380,9 @@ class CuwalidAPP(QMainWindow):
         self.logo_label = QLabel()
         
         if getattr(sys, 'frozen', False):
-            logo_path = os.path.join(sys._MEIPASS, 'images', 'CUWALID_Logo_LS_Full_Colour.png')
+            logo_path = os.path.join(sys._MEIPASS, 'images', 'CUWALID_Logo_LS_Tag_dark.png')
         else:
-            logo_path = 'images/CUWALID_Logo_LS_Full_Colour.png'
+            logo_path = 'images/CUWALID_Logo_LS_Tag_dark.png'
         
         try:
             logo_pixmap = QPixmap(logo_path)
@@ -372,3 +397,16 @@ class CuwalidAPP(QMainWindow):
         banner_layout.addStretch()
         
         return banner_widget
+    
+    def toggle_all_points(self, state):
+        for i in range(self.point_selector_list.count()):
+            self.point_selector_list.item(i).setCheckState(Qt.CheckState.Checked if state else Qt.CheckState.Unchecked)
+
+    def toggle_all_csv1(self, state):
+        for i in range(self.csv_var_selector_1.count()):
+            self.csv_var_selector_1.item(i).setCheckState(Qt.CheckState.Checked if state else Qt.CheckState.Unchecked)
+
+    def toggle_all_csv2(self, state):
+        for i in range(self.csv_var_selector_2.count()):
+            self.csv_var_selector_2.item(i).setCheckState(Qt.CheckState.Checked if state else Qt.CheckState.Unchecked)
+
