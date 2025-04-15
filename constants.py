@@ -1,3 +1,5 @@
+APP_VERSION = "v1.0.5"
+
 APP_STYLESHEET = """
             * {
                 color: white; /* Default text color for all widgets */
@@ -121,3 +123,4 @@ APP_STYLESHEET = """
                 max-height: 1000px;
             }
         """
+
