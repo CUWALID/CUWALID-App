@@ -3,7 +3,7 @@ import sys
 import traceback
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtGui import QIcon
-from ui_components import CuwalidAPP
+from ui.main_window import CuwalidAPP
 
 # Get the correct log path for error logging
 def get_log_path():
