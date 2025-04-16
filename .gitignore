@@ -5,3 +5,4 @@ test_output/
 errors.txt
 /__pycache__/
 .conda/
+/ui/__pycache__/
