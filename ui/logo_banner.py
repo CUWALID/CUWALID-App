@@ -41,7 +41,7 @@ def create_logo_banner(parent):
     help_button.setStyleSheet("color: white; background-color: #444444; padding: 5px 10px;")
     icon = parent.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView)
     help_button.setIcon(icon)
-    help_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://cuwalid.github.io/tutorials/#cuwalid-app")))
+    help_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://cuwalid.github.io/tutorials/cuwalid-app")))
     right_buttons_layout.addWidget(help_button)
 
     update_button = QPushButton("Check for Updates")
